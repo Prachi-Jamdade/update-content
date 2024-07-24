@@ -4,6 +4,7 @@ import sys
 import json
 import os
 from github import Github
+import re
 
 def fetch_articles_from_rss(feed_url):
     response = requests.get(feed_url)
@@ -18,6 +19,19 @@ def parse_rss_articles(feed_content):
         link = item.find('link').text
         articles.append({'title': title, 'link': link})
     return articles
+
+def fetch_articles_from_devto(username):
+    api_url = f"https://dev.to/api/articles?username={username}"
+    response = requests.get(api_url)
+    response.raise_for_status()
+    articles = response.json()
+    return [{'title': article['title'], 'link': article['url']} for article in articles]
+
+def extract_devto_username(profile_url):
+    match = re.search(r'dev\.to\/@?([\w\d]+)', profile_url)
+    if match:
+        return match.group(1)
+    return None
 
 def write_article_names(file_path, articles):
     with open(file_path, 'w') as f:
@@ -55,9 +69,15 @@ if __name__ == "__main__":
 
     all_articles = []
     for url in FEED_URLS:
-        feed_content = fetch_articles_from_rss(url)
-        articles = parse_rss_articles(feed_content)
-        all_articles.extend(articles)
+        if 'dev.to' in url:
+            username = extract_devto_username(url)
+            if username:
+                articles = fetch_articles_from_devto(username)
+                all_articles.extend(articles)
+        else:
+            feed_content = fetch_articles_from_rss(url)
+            articles = parse_rss_articles(feed_content)
+            all_articles.extend(articles)
 
     all_articles = all_articles[:ARTICLE_LIMIT]
     write_article_names(ARTICLES_MD_PATH, all_articles)
