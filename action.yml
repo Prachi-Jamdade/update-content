@@ -1,4 +1,5 @@
 name: 'Update Profile README'
+author: 'Prachi Jamdade'
 description: 'Fetch recent articles from RSS feeds and update the user profile README.'
 inputs:
   feed_urls:
