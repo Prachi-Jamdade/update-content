@@ -19,3 +19,6 @@ runs:
     - ${{ inputs.feed_urls }}
     - ${{ inputs.article_limit }}
     - ${{ inputs.github_token }}
+branding:
+  icon: 'align-right'
+  color: 'blue'
