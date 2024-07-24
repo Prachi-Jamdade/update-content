@@ -1,0 +1,18 @@
+name: 'Fetch Recent Articles'
+description: 'Fetch recent articles from various platforms and update README'
+inputs:
+  api_urls:
+    description: 'Comma-separated list of API URLs'
+    required: true
+  readme_path:
+    description: 'Path to the README file'
+    required: true
+  article_limit:
+    description: 'Limit the number of articles shown in README'
+    required: true
+runs:
+  using: 'python'
+  main: 'fetch_recent_content.py'
+  pre:
+    - python -m pip install --upgrade pip
+    - pip install -r requirements.txt
