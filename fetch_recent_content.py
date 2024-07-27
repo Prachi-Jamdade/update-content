@@ -73,7 +73,7 @@ if __name__ == "__main__":
     ARTICLE_LIMIT = int(sys.argv[2])
     ARTICLE_TYPE = sys.argv[3]
     GITHUB_TOKEN = sys.argv[4]
-    ARTICLES_MD_PATH = 'README.md'
+    ARTICLES_MD_PATH = 'articles.md'
 
     all_articles = []
     for url in FEED_URLS:
