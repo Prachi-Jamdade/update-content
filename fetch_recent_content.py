@@ -2,9 +2,8 @@ import requests
 import xml.etree.ElementTree as ET
 import sys
 import json
-import os
-from github import Github
 import re
+from github import Github
 
 def fetch_articles_from_rss(feed_url):
     response = requests.get(feed_url)
@@ -25,7 +24,7 @@ def fetch_articles_from_devto(username):
     response = requests.get(api_url)
     response.raise_for_status()
     articles = response.json()
-    return [{'title': article['title'], 'link': article['url']} for article in articles]
+    return [{'title': article['title'], 'link': article['url'], 'positive_reactions_count': article['positive_reactions_count'], 'comments_count': article['comments_count']} for article in articles]
 
 def extract_devto_username(profile_url):
     match = re.search(r'dev\.to\/@?([\w\d]+)', profile_url)
@@ -35,7 +34,7 @@ def extract_devto_username(profile_url):
 
 def write_article_names(file_path, articles):
     with open(file_path, 'w') as f:
-        f.write('## Recent Articles\n\n')
+        f.write('## Articles\n\n')
         for article in articles:
             f.write(f"- [{article['title']}]({article['link']})\n")
 
@@ -59,13 +58,22 @@ def update_readme(repo, articles_md_path):
                        recent_articles.strip() + "\n" +
                        readme_content[end_idx:].strip())
 
-    repo.update_file(readme.path, 'Update recent articles', updated_content, readme.sha)
+    repo.update_file(readme.path, 'Update articles', updated_content, readme.sha)
+
+def get_top_articles(articles, top_n=5):
+    sorted_articles = sorted(articles, key=lambda x: (x['positive_reactions_count'], x['comments_count']), reverse=True)
+    return sorted_articles[:top_n]
 
 if __name__ == "__main__":
+    if len(sys.argv) != 5:
+        print("Usage: python update_articles.py <feed_urls> <article_limit> <article_type> <github_token>")
+        sys.exit(1)
+
     FEED_URLS = sys.argv[1].split(',')
     ARTICLE_LIMIT = int(sys.argv[2])
-    GITHUB_TOKEN = sys.argv[3]
-    ARTICLES_MD_PATH = 'recent_articles.md'
+    ARTICLE_TYPE = sys.argv[3]
+    GITHUB_TOKEN = sys.argv[4]
+    ARTICLES_MD_PATH = 'articles.md'
 
     all_articles = []
     for url in FEED_URLS:
@@ -73,7 +81,11 @@ if __name__ == "__main__":
             username = extract_devto_username(url)
             if username:
                 articles = fetch_articles_from_devto(username)
-                all_articles.extend(articles)
+                if ARTICLE_TYPE == 'top' and ARTICLE_LIMIT > 0:
+                    top_articles = get_top_articles(articles, ARTICLE_LIMIT)
+                    all_articles.extend(top_articles)
+                elif ARTICLE_TYPE == 'recent':
+                    all_articles.extend(articles)
         else:
             feed_content = fetch_articles_from_rss(url)
             articles = parse_rss_articles(feed_content)
