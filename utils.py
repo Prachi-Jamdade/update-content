@@ -1,7 +1,6 @@
 import requests
-import xml.etree.ElementTree as ET
-import sys
 import json
+import xml.etree.ElementTree as ET
 import re
 from github import Github
 
@@ -36,7 +35,12 @@ def write_article_names(file_path, articles):
     with open(file_path, 'w') as f:
         f.write('## Articles\n\n')
         for article in articles:
-            f.write(f"- [{article['title']}]({article['link']})\n")
+            link = article.get('link')
+            url = article.get('url', '#')  
+            if link is None:
+                f.write(f"- [{article['title']}]({url})\n")
+            else:
+                f.write(f"- [{article['title']}]({link})\n")
 
 def update_readme(repo, articles_md_path):
     readme = repo.get_readme()
@@ -60,41 +64,57 @@ def update_readme(repo, articles_md_path):
 
     repo.update_file(readme.path, 'Update articles', updated_content, readme.sha)
 
-def get_top_articles(articles, top_n=5):
+def sort_devto_blogs(articles, top_n=5):
     sorted_articles = sorted(articles, key=lambda x: (x['positive_reactions_count'], x['comments_count']), reverse=True)
     return sorted_articles[:top_n]
 
-if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print("Usage: python update_articles.py <feed_urls> <article_limit> <article_type> <github_token>")
-        sys.exit(1)
+def fetch_articles_from_hashnode(token):
+    url = "https://gql.hashnode.com"
+    
+    query = """
+    query {
+        me {
+            posts(pageSize: 20, page: 1) {
+                nodes {
+                    id
+                    title
+                    url
+                    views
+                    reactionCount
+                    replyCount
+                    responseCount
+                }
+            }
+        }
+    } 
+    """
+    
+    data = {'query': query}
 
-    FEED_URLS = sys.argv[1].split(',')
-    ARTICLE_LIMIT = int(sys.argv[2])
-    ARTICLE_TYPE = sys.argv[3]
-    GITHUB_TOKEN = sys.argv[4]
-    ARTICLES_MD_PATH = 'articles.md'
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
 
-    all_articles = []
-    for url in FEED_URLS:
-        if 'dev.to' in url:
-            username = extract_devto_username(url)
-            if username:
-                articles = fetch_articles_from_devto(username)
-                if ARTICLE_TYPE == 'top' and ARTICLE_LIMIT > 0:
-                    top_articles = get_top_articles(articles, ARTICLE_LIMIT)
-                    all_articles.extend(top_articles)
-                elif ARTICLE_TYPE == 'recent':
-                    all_articles.extend(articles)
-        else:
-            feed_content = fetch_articles_from_rss(url)
-            articles = parse_rss_articles(feed_content)
-            all_articles.extend(articles)
+    response = requests.post(
+        url=url,
+        headers=headers,
+        data=json.dumps(data)
+    )
+    
+    if response.status_code == 200:
+        response_data = response.json()
+        posts = response_data.get('data', {}).get('me', {}).get('posts', {}).get('nodes', [])
+        return posts
+    else:
+        print(f"Query failed to run with a {response.status_code}. Error: {response.text}")
+        return []
 
-    all_articles = all_articles[:ARTICLE_LIMIT]
-    write_article_names(ARTICLES_MD_PATH, all_articles)
+def sort_hashnode_blogs(articles, top_n=5):
+    sorted_articles = sorted(articles, key=lambda x: (x.get('views', 0), x.get('reactionCount', 0)), reverse=True)
+    return sorted_articles[:top_n]
 
-    g = Github(GITHUB_TOKEN)
+def get_github_repo(github_token):
+    g = Github(github_token)
     user = g.get_user()
-    repo = user.get_repo(user.login)
-    update_readme(repo, ARTICLES_MD_PATH)
+    return user.get_repo(user.login)

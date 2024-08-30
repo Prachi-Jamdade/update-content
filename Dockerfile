@@ -5,4 +5,4 @@ COPY requirements.txt /requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-ENTRYPOINT ["python", "/fetch_recent_content.py"]
+ENTRYPOINT ["python", "/update_articles.py"]
